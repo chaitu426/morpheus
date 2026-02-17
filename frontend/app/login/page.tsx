@@ -7,10 +7,12 @@ export default function LoginPage() {
   return (
     <main className="neon-bg min-h-screen flex flex-col items-center justify-center px-6 text-slate-900 dark:text-white transition-colors duration-500 overflow-x-hidden">
       
+      {/* Theme Toggle */}
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
 
+      {/* Login Form Card */}
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
@@ -39,7 +41,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-slate-600 dark:text-zinc-400 text-sm">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <a
             href="/signup"
             className="text-blue-600 dark:text-purple-400 hover:underline"
