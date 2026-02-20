@@ -9,6 +9,9 @@ import {
   integer,
   index,
   uniqueIndex,
+  jsonb,
+  date,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", [
@@ -46,6 +49,14 @@ export const documentTypeEnum = pgEnum("document_type", [
   "other",
 ]);
 
+export const messageTypeEnum = pgEnum("message_type", [
+  "text",
+  "schedule_request",
+  "schedule_response",
+  "session_link",
+  "system",
+]);
+
 
 export const users = pgTable(
   "users",
@@ -81,6 +92,8 @@ export const students = pgTable(
       .notNull(),
 
     bio: text("bio"),
+    grade: varchar("grade", { length: 50 }),
+    schoolName: varchar("school_name", { length: 255 }),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -102,7 +115,18 @@ export const tutors = pgTable(
     education: text("education").notNull(),
     experienceYears: integer("experience_years").default(0),
 
+    collegeName: varchar("college_name", { length: 255 }),
+    marks: varchar("marks", { length: 50 }),
+    degreeName: varchar("degree_name", { length: 255 }),
+
+    dob: date("dob"),
+    city: varchar("city", { length: 255 }),
+    introVideoUrl: text("intro_video_url"),
+    collegeIdUrl: text("college_id_url"),
+
     status: tutorStatusEnum("status").default("pending"),
+
+    remarks: text("remarks"), // Admin rejection/approval notes
 
     averageRating: integer("average_rating").default(0),
     totalReviews: integer("total_reviews").default(0),
@@ -141,6 +165,7 @@ export const tutorSubjects = pgTable(
     level: varchar("level", { length: 50 }).notNull(), // beginner | medium | advanced
   },
   (table) => ({
+    pk: primaryKey({ columns: [table.tutorId, table.subjectId] }),
     tutorIdx: index("tutor_subjects_tutor_idx").on(table.tutorId),
   })
 );
@@ -160,6 +185,7 @@ export const studentSubjects = pgTable(
     level: varchar("level", { length: 50 }).notNull(),
   },
   (table) => ({
+    pk: primaryKey({ columns: [table.studentId, table.subjectId] }),
     studentIdx: index("student_subjects_student_idx").on(table.studentId),
   })
 );
@@ -191,6 +217,8 @@ export const tutorTests = pgTable("tutor_tests", {
   id: uuid("id").defaultRandom().primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
+  questions: jsonb("questions").notNull(), // Array of MCQ/MSQ
+  totalMarks: integer("total_marks").notNull(),
 });
 
 export const tutorTestAttempts = pgTable(
@@ -237,6 +265,9 @@ export const sessions = pgTable(
     status: sessionStatusEnum("status").default("scheduled"),
 
     mediasoupRoomId: varchar("mediasoup_room_id", { length: 255 }),
+
+    topic: varchar("topic", { length: 255 }),
+    description: text("description"),
 
     scheduledAt: timestamp("scheduled_at"),
     startedAt: timestamp("started_at"),
@@ -346,6 +377,9 @@ export const messages = pgTable("messages", {
 
   content: text("content").notNull(),
 
+  type: messageTypeEnum("type").default("text").notNull(),
+  metadata: jsonb("metadata"), // For session_id, status, etc.
+
   status: messageStatusEnum("status").default("sent"),
 
   isEdited: boolean("is_edited").default(false),
@@ -353,3 +387,90 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   editedAt: timestamp("edited_at"),
 });
+
+
+// ─── Auth: Email Verification OTPs ───────────────────────────────────────────
+export const emailVerificationOtps = pgTable(
+  "email_verification_otps",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+
+    otp: varchar("otp", { length: 6 }).notNull(),
+
+    expiresAt: timestamp("expires_at").notNull(),
+
+    used: boolean("used").default(false).notNull(),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("otp_user_idx").on(table.userId),
+  })
+);
+
+
+// ─── Auth: Refresh Tokens ─────────────────────────────────────────────────────
+export const refreshTokens = pgTable(
+  "refresh_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Store SHA-256 hash of the token, never the raw token
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+
+    expiresAt: timestamp("expires_at").notNull(),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("refresh_tokens_user_idx").on(table.userId),
+    tokenHashIdx: uniqueIndex("refresh_tokens_hash_idx").on(table.tokenHash),
+  })
+);
+
+
+// ─── Video Call Events ────────────────────────────────────────────────────────
+export const callEventTypeEnum = pgEnum("call_event_type", [
+  "joined",
+  "left",
+  "muted",
+  "unmuted",
+  "video_on",
+  "video_off",
+  "ended",
+]);
+
+/**
+ * Persists every in-call event for dashboard analytics and audit.
+ * Lets you calculate: call duration, who muted when, who ended the call.
+ */
+export const callEvents = pgTable(
+  "call_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    sessionId: uuid("session_id")
+      .references(() => sessions.id, { onDelete: "cascade" })
+      .notNull(),
+
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+
+    eventType: callEventTypeEnum("event_type").notNull(),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    sessionIdx: index("call_events_session_idx").on(table.sessionId),
+    userIdx: index("call_events_user_idx").on(table.userId),
+  })
+);
