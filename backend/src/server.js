@@ -16,6 +16,8 @@ import sessionRouter from './routes/session.route.js';
 import subjectsRouter from './routes/subjects.route.js';
 import connectionRouter from './routes/connection.route.js';
 import reviewRouter from './routes/review.route.js';
+import chatbotRouter from './routes/chatbot.route.js';
+import communityRouter from './routes/community.route.js';
 import { getPublicTutorProfile } from './controller/user.controller.js';
 import { setupSocket } from './socket/index.js';
 
@@ -28,7 +30,7 @@ app.set('io', io);
 
 app.use(cors({
     origin: env.CLIENT_URL,
-    credentials: true, 
+    credentials: true,
 }));
 
 app.use(express.json());
@@ -48,6 +50,8 @@ app.use('/api/sessions', sessionRouter);
 app.use('/api/subjects', subjectsRouter);
 app.use('/api/connections', connectionRouter);
 app.use('/api/reviews', reviewRouter);
+app.use('/api/chatbot', chatbotRouter);
+app.use('/api/community', communityRouter);
 
 
 app.get('/api/tutors/:tutorId', getPublicTutorProfile);
